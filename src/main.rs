@@ -22,6 +22,7 @@ use embassy_rp::usb::Driver;
 use embassy_time::{Duration, Timer};
 use embedded_io_async::Write;
 use log::{info, warn};
+use net::handle_conn;
 use rand::RngCore;
 use static_cell::StaticCell; //, panic_probe as _};
                              //use rp2040_panic_usb_boot as _;
@@ -118,11 +119,11 @@ async fn main(spawner: Spawner) {
 
     // Init network stack
     static STACK: StaticCell<Stack<cyw43::NetDriver<'static>>> = StaticCell::new();
-    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
+    static RESOURCES: StaticCell<StackResources<4>> = StaticCell::new();
     let stack = &*STACK.init(Stack::new(
         net_device,
         config,
-        RESOURCES.init(StackResources::<3>::new()),
+        RESOURCES.init(StackResources::<4>::new()),
         seed,
     ));
 
@@ -156,15 +157,20 @@ async fn main(spawner: Spawner) {
 
     // And now we can use it!
 
-    let mut rx_buffer = [0u8; 8192];
-    let mut tx_buffer = [0u8; 8192];
-    let mut buf = [0u8; 8192];
-
     info!("Created bufs");
     Timer::after_millis(100).await;
 
+    static mut RX_BUF: [u8; 8192] = [0; 8192];
+    static mut TX_BUF: [u8; 8192] = [0; 8192];
+
     loop {
-        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer).await;
+        let rx_buffer = unsafe { &mut RX_BUF };
+        let tx_buffer = unsafe { &mut TX_BUF };
+
+        rx_buffer.fill(0);
+        tx_buffer.fill(0);
+
+        let mut socket = TcpSocket::new(stack, rx_buffer, tx_buffer);
         socket.set_timeout(Some(Duration::from_secs(10)));
 
         control.gpio_set(0, false).await;
@@ -176,32 +182,13 @@ async fn main(spawner: Spawner) {
             continue;
         }
 
-        info!("Received connection from {:?}", socket.remote_endpoint());
         control.gpio_set(0, true).await;
+        info!("Received connection from {:?}", socket.remote_endpoint());
         Timer::after_millis(100).await;
 
-        loop {
-            let n = match socket.read(&mut buf).await {
-                Ok(0) => {
-                    warn!("read EOF");
-                    break;
-                }
-                Ok(n) => n,
-                Err(e) => {
-                    warn!("read error: {:?}", e);
-                    break;
-                }
-            };
+        spawner.spawn(handle_conn(socket)).unwrap();
 
-            /*info!("rxd {}", from_utf8(&buf[..n]).unwrap());
-
-            match socket.write_all(&buf[..n]).await {
-                Ok(()) => {}
-                Err(e) => {
-                    warn!("write error: {:?}", e);
-                    break;
-                }
-            };*/
-        }
+        info!("Creating a new thingy majigy");
+        Timer::after_millis(100).await;
     }
 }
