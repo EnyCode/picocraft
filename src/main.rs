@@ -160,15 +160,17 @@ async fn main(spawner: Spawner) {
     info!("Created bufs");
     Timer::after_millis(100).await;
 
-    static mut RX_BUF: [u8; 8192] = [0; 8192];
-    static mut TX_BUF: [u8; 8192] = [0; 8192];
+    static mut RX_BUF: [[u8; 1024]; 4] = [[0; 1024]; 4];
+    static mut TX_BUF: [[u8; 1024]; 4] = [[0; 1024]; 4];
+
+    let mut i = 0;
 
     loop {
-        let rx_buffer = unsafe { &mut RX_BUF };
-        let tx_buffer = unsafe { &mut TX_BUF };
+        let rx_buffer = unsafe { &mut RX_BUF[i] };
+        let tx_buffer = unsafe { &mut TX_BUF[i] };
 
         rx_buffer.fill(0);
-        tx_buffer.fill(0);
+        rx_buffer.fill(0);
 
         let mut socket = TcpSocket::new(stack, rx_buffer, tx_buffer);
         socket.set_timeout(Some(Duration::from_secs(10)));
@@ -190,5 +192,10 @@ async fn main(spawner: Spawner) {
 
         info!("Creating a new thingy majigy");
         Timer::after_millis(100).await;
+
+        i += 1;
+        if i >= 4 {
+            i = 0;
+        }
     }
 }

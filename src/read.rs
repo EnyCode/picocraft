@@ -12,7 +12,8 @@ pub trait ReadExtension {
     async fn read_f32(&mut self) -> f32;
     async fn read_f64(&mut self) -> f64;
     async fn read_bool(&mut self) -> bool;
-    async fn read_string<const N: usize>(&mut self) -> String<N>;
+    // TODO: fix max size
+    async fn read_string(&mut self) -> String<128>;
     // TODO: add more types
     async fn read_varint(&mut self) -> i32;
     async fn read_varlong(&mut self) -> i64;
@@ -42,9 +43,9 @@ impl ReadExtension for TcpReader<'_> {
         self.read_u8().await != 0
     }
 
-    async fn read_string<const N: usize>(&mut self) -> String<N> {
+    async fn read_string(&mut self) -> String<128> {
         let len = self.read_varint().await as usize;
-        let mut buf: Vec<u8, N> = Vec::new();
+        let mut buf: Vec<u8, 128> = Vec::new();
         self.read(&mut buf[..len]).await.unwrap();
         String::from_utf8(buf).unwrap()
     }
