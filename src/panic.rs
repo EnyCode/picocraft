@@ -1,3 +1,7 @@
+/*
+   This file uses code from the `rp2040-panic-usb-boot`, and is therefore dual licensed under MIT or Apache-2.0
+*/
+
 use core::fmt::Write;
 use core::panic::PanicInfo;
 use rp2040_hal::pac as rp2040;

@@ -31,10 +31,10 @@ bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
 });
 
-const WIFI_NETWORK: &str = "SSID";
-const WIFI_PASSWORD: &str = "PASSWORD";
-
+mod events;
+mod net;
 mod panic;
+mod read;
 
 #[embassy_executor::task]
 async fn cyw43_task(
@@ -118,11 +118,11 @@ async fn main(spawner: Spawner) {
 
     // Init network stack
     static STACK: StaticCell<Stack<cyw43::NetDriver<'static>>> = StaticCell::new();
-    static RESOURCES: StaticCell<StackResources<2>> = StaticCell::new();
+    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
     let stack = &*STACK.init(Stack::new(
         net_device,
         config,
-        RESOURCES.init(StackResources::<2>::new()),
+        RESOURCES.init(StackResources::<3>::new()),
         seed,
     ));
 
@@ -130,7 +130,10 @@ async fn main(spawner: Spawner) {
 
     loop {
         //control.join_open(WIFI_NETWORK).await;
-        match control.join_wpa2(WIFI_NETWORK, WIFI_PASSWORD).await {
+        match control
+            .join_wpa2(env!("WIFI_NETWORK"), env!("WIFI_PASSWORD"))
+            .await
+        {
             Ok(_) => break,
             Err(err) => {
                 info!("join failed with status={}", err.status);
@@ -160,14 +163,7 @@ async fn main(spawner: Spawner) {
     info!("Created bufs");
     Timer::after_millis(100).await;
 
-    let mut ran = false;
-
     loop {
-        if ran {
-            core::panic!("Ran");
-        }
-        ran = true;
-
         let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer).await;
         socket.set_timeout(Some(Duration::from_secs(10)));
 
@@ -197,7 +193,7 @@ async fn main(spawner: Spawner) {
                 }
             };
 
-            info!("rxd {}", from_utf8(&buf[..n]).unwrap());
+            /*info!("rxd {}", from_utf8(&buf[..n]).unwrap());
 
             match socket.write_all(&buf[..n]).await {
                 Ok(()) => {}
@@ -205,7 +201,7 @@ async fn main(spawner: Spawner) {
                     warn!("write error: {:?}", e);
                     break;
                 }
-            };
+            };*/
         }
     }
 }
