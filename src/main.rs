@@ -34,6 +34,7 @@ bind_interrupts!(struct Irqs {
 
 mod events;
 mod net;
+mod packets;
 mod panic;
 mod read;
 
