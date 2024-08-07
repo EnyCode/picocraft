@@ -59,6 +59,7 @@ rand = { version = "0.8.5", default-features = false }
 embedded-io-async = "0.6.1"
 rp2040 = "0.1.0"
 rp2040-hal = "0.10.2"
+embedded-alloc = "0.5.1"
 
 [profile.release]
 debug = 2

@@ -1,5 +1,5 @@
+use alloc::{boxed::Box, string::String, vec::Vec};
 use embassy_net::tcp::TcpReader;
-use heapless::{String, Vec};
 
 /// List of types is taken from [wiki.vg](https://wiki.vg/Protocol#Data_types)
 pub trait ReadExtension {
@@ -12,7 +12,7 @@ pub trait ReadExtension {
     async fn read_f32(&mut self) -> f32;
     async fn read_f64(&mut self) -> f64;
     async fn read_bool(&mut self) -> bool;
-    async fn read_string<const N: usize>(&mut self) -> String<N>;
+    async fn read_string(&mut self) -> String;
     // TODO: add more types
     async fn read_varint(&mut self) -> i32;
     async fn read_varlong(&mut self) -> i64;
@@ -42,9 +42,9 @@ impl ReadExtension for TcpReader<'_> {
         self.read_u8().await != 0
     }
 
-    async fn read_string<const N: usize>(&mut self) -> String<N> {
+    async fn read_string(&mut self) -> String {
         let len = self.read_varint().await as usize;
-        let mut buf: Vec<u8, N> = Vec::new();
+        let mut buf: Vec<u8> = Vec::with_capacity(len);
         self.read(&mut buf).await.unwrap();
         String::from_utf8(buf).unwrap()
     }
@@ -73,17 +73,18 @@ impl ReadExtension for TcpReader<'_> {
     }
 }
 
-pub struct Slice<'a> {
-    buf: &'a [u8],
+pub struct Slice {
+    buf: Box<[u8]>,
     pos: usize,
 }
 
-impl<'a> Slice<'a> {
-    pub fn new(buf: &'a [u8]) -> Slice<'a> {
+impl Slice {
+    pub fn new(buf: Box<[u8]>) -> Slice {
+        log::info!("{:?}", buf);
         Slice { buf, pos: 0 }
     }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<(), ()> {
+    pub async fn read(&mut self, buf: &mut [u8]) -> Result<(), ()> {
         let len = buf.len();
         if len < self.buf.len() - self.pos {
             buf.clone_from_slice(&self.buf[self.pos..self.pos + len]);
@@ -99,13 +100,13 @@ macro_rules! impl_slice_read {
     ($ty:ty, $read:ident, $size:expr) => {
         async fn $read(&mut self) -> $ty {
             let mut buf = [0; $size];
-            self.read(&mut buf).unwrap();
+            self.read(&mut buf).await.unwrap();
             <$ty>::from_be_bytes(buf)
         }
     };
 }
 
-impl<'a> ReadExtension for Slice<'a> {
+impl ReadExtension for Slice {
     impl_slice_read!(i8, read_i8, 1);
     impl_slice_read!(u8, read_u8, 1);
     impl_slice_read!(i16, read_i16, 2);
@@ -119,10 +120,13 @@ impl<'a> ReadExtension for Slice<'a> {
         self.read_u8().await != 0
     }
 
-    async fn read_string<const N: usize>(&mut self) -> String<N> {
+    async fn read_string(&mut self) -> String {
         let len = self.read_varint().await as usize;
-        let mut buf: Vec<u8, N> = Vec::new();
-        self.read(&mut buf).unwrap();
+        let mut buf = alloc::vec::Vec::with_capacity(len);
+        unsafe { buf.set_len(len) }
+        self.read(&mut buf).await.unwrap();
+        log::info!("len {} string {:?}", len, buf);
+
         String::from_utf8(buf).unwrap()
     }
 

@@ -57,8 +57,11 @@ async fn read_packets(
                     let packet = HandshakePacket::read_packet(&mut packet.data).await;
 
                     info!(
-                        "Received handshake packet {} {:?}",
-                        packet.protocol_version, packet.next_state
+                        "Received handshake packet {} {} {} {:?}",
+                        packet.protocol_version,
+                        packet.server_address,
+                        packet.server_port,
+                        packet.next_state
                     );
                     Timer::after_millis(100).await;
 
