@@ -1,5 +1,7 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use embassy_net::tcp::TcpReader;
+use embassy_time::Timer;
+use log::info;
 
 /// List of types is taken from [wiki.vg](https://wiki.vg/Protocol#Data_types)
 pub trait ReadExtension {
@@ -86,7 +88,7 @@ impl Slice {
 
     pub async fn read(&mut self, buf: &mut [u8]) -> Result<(), ()> {
         let len = buf.len();
-        if len < self.buf.len() - self.pos {
+        if len <= self.buf.len() - self.pos {
             buf.clone_from_slice(&self.buf[self.pos..self.pos + len]);
             self.pos += len;
             Ok(())
@@ -108,7 +110,14 @@ macro_rules! impl_slice_read {
 
 impl ReadExtension for Slice {
     impl_slice_read!(i8, read_i8, 1);
-    impl_slice_read!(u8, read_u8, 1);
+
+    async fn read_u8(&mut self) -> u8 {
+        let mut buf = [0; 1];
+        self.read(&mut buf).await.unwrap();
+        <u8>::from_be_bytes(buf)
+    }
+
+    //impl_slice_read!(u8, read_u8, 1);
     impl_slice_read!(i16, read_i16, 2);
     impl_slice_read!(u16, read_u16, 2);
     impl_slice_read!(i32, read_i32, 4);

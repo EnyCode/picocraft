@@ -46,6 +46,12 @@ cortex-m-rt = "0.7.0"
 
 critical-section = "1.1"
 
+serde = { version = "1.0.203", default-features = false, features = [
+    "derive",
+    "alloc",
+] }
+serde-json-core = "0.5.1"
+
 #panic-probe = { version = "0.3", features = ["print-defmt"] }
 heapless = "0.8"
 

@@ -6,6 +6,8 @@ use handshake::HandshakePacket;
 
 use crate::read::{ReadExtension, Slice};
 
+pub mod status;
+
 pub trait ReadPacket {
     async fn read_packet(socket: &mut Slice) -> Self;
 }
@@ -33,6 +35,8 @@ pub async fn parse_packet(socket: &mut TcpReader<'_>) -> Packet {
 pub mod handshake {
     use alloc::string::String;
     use embassy_net::tcp::TcpReader;
+    use embassy_time::Timer;
+    use log::info;
 
     use crate::{
         net::State,
