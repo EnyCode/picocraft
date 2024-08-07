@@ -40,6 +40,7 @@ mod net;
 mod packets;
 mod panic;
 mod read;
+mod write;
 
 // We use the heap to size packets
 #[global_allocator]

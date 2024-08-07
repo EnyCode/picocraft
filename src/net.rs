@@ -1,7 +1,13 @@
 use crate::{
-    packets::{handshake::HandshakePacket, parse_packet, ReadPacket},
+    packets::{
+        handshake::HandshakePacket,
+        parse_packet,
+        status::{DescriptionData, PingRequest, PlayerData, PongResponse, StatusJson, VersionData},
+        ReadPacket, WritePacket,
+    },
     read::ReadExtension,
 };
+use alloc::string::ToString;
 use embassy_net::tcp::{TcpReader, TcpSocket};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel};
 use embassy_time::Timer;
@@ -36,6 +42,31 @@ pub async fn handle_conn(
                     info!("Changing state to {:?}", new_state);
                     Timer::after_millis(100).await;
                     state = new_state;
+                }
+                PacketEvent::StatusRequest => {
+                    let status = StatusJson {
+                        version: VersionData {
+                            name: "1.20.1".to_string(),
+                            protocol: 763,
+                        },
+                        players: Some(PlayerData {
+                            max: 4,
+                            online: 0,
+                            sample: None,
+                        }),
+                        description: Some(DescriptionData {
+                            text: "A PicoCraft server.".to_string(),
+                        }),
+                        favicon: None,
+                        enforces_secure_chat: false,
+                    };
+
+                    status.write_packet(&mut write).await;
+                }
+                PacketEvent::PingRequest(payload) => {
+                    info!("Sending pong with payload {}", payload);
+                    Timer::after_millis(100).await;
+                    PongResponse { payload }.write_packet(&mut write).await;
                 }
             }
         }
@@ -72,12 +103,35 @@ async fn read_packets(
                 _ => {}
             }
         }
+        State::Status => {
+            let mut packet = parse_packet(socket).await;
+
+            match packet.id {
+                0x00 => {
+                    info!("Received status request");
+                    Timer::after_millis(100).await;
+                    channel.send(PacketEvent::StatusRequest).await;
+                }
+                0x01 => {
+                    info!("Received ping request");
+                    Timer::after_millis(100).await;
+                    let ping = PingRequest::read_packet(&mut packet.data).await;
+                    channel.send(PacketEvent::PingRequest(ping.payload)).await;
+                }
+                _ => {
+                    info!("Received unknown packet with id {}", packet.id);
+                    Timer::after_millis(100).await;
+                }
+            }
+        }
         _ => {}
     }
 }
 
 pub enum PacketEvent {
     ChangeState(State),
+    StatusRequest,
+    PingRequest(i64),
 }
 
 #[derive(Debug)]

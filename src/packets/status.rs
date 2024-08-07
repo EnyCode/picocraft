@@ -1,14 +1,40 @@
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
-use crate::read::ReadExtension;
+use crate::{
+    read::{ReadExtension, Slice},
+    write::WriteExtension,
+};
+use embassy_net::tcp::TcpWriter;
 
-use super::ReadPacket;
+use super::{ReadPacket, WritePacket};
 use serde::Serialize;
 
 // We don't have a StatusRequest packet because its empty and theres no point
+// We also don't have a StatusResponse packet since its just a wrapper over StatusJson
 
-pub struct StatusResponse {
-    pub data: String,
+const DATA: &'static str = r#"{"version":{"name":"1.20.1","protocol":763},"players":{"max":4,"online":0,},"description":{"text":"Hello, world!"},"enforcesSecureChat":false}"#;
+
+impl WritePacket for StatusJson {
+    async fn write_packet(&self, socket: &mut TcpWriter<'_>) {
+        let data = DATA.as_bytes();
+        //serde_json_core::ser::to_slice(self, &mut data).unwrap();
+        let length = data.len() as i32;
+
+        log::info!("len {}", length);
+
+        socket.write_varint(145).await;
+        socket.write_varint(0).await;
+        socket.write(data).await.unwrap();
+
+        log::info!("{:?}", data);
+
+        socket.flush().await.unwrap();
+
+        log::info!("DONE WRITING!");
+    }
 }
 
 #[derive(Serialize)]
@@ -43,5 +69,30 @@ pub struct SamplePlayer {
 
 #[derive(Serialize)]
 pub struct DescriptionData {
-    pub text: StatusJson,
+    pub text: String,
+}
+
+pub struct PingRequest {
+    pub payload: i64,
+}
+
+impl ReadPacket for PingRequest {
+    async fn read_packet(socket: &mut Slice) -> Self {
+        PingRequest {
+            payload: socket.read_i64().await,
+        }
+    }
+}
+
+pub struct PongResponse {
+    pub payload: i64,
+}
+
+impl WritePacket for PongResponse {
+    async fn write_packet(&self, socket: &mut TcpWriter<'_>) {
+        // TODO: better mechanism for lengths
+        socket.write_varint(1 + 8).await;
+        socket.write_varint(0x01).await;
+        socket.write_i64(self.payload).await;
+    }
 }

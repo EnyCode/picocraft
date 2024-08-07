@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, vec::Vec};
-use embassy_net::tcp::TcpReader;
+use embassy_net::tcp::{TcpReader, TcpWriter};
 use embassy_time::Timer;
 use embedded_io_async::Read;
 use handshake::HandshakePacket;
@@ -10,6 +10,10 @@ pub mod status;
 
 pub trait ReadPacket {
     async fn read_packet(socket: &mut Slice) -> Self;
+}
+
+pub trait WritePacket {
+    async fn write_packet(&self, socket: &mut TcpWriter<'_>);
 }
 
 pub struct Packet {
