@@ -85,6 +85,8 @@ async fn read_packets(
             Timer::after_millis(100).await;
             match packet.id {
                 0x00 => {
+                    info!("Packet data `{:?}`", packet.data);
+                    Timer::after_millis(100).await;
                     let packet = HandshakePacket::read_packet(&mut packet.data).await;
 
                     info!(

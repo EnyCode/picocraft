@@ -75,8 +75,9 @@ impl ReadExtension for TcpReader<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct Slice {
-    buf: Box<[u8]>,
+    pub(super) buf: Box<[u8]>,
     pos: usize,
 }
 

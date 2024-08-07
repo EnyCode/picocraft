@@ -2,6 +2,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use embassy_time::Timer;
 
 use crate::{
     read::{ReadExtension, Slice},
@@ -11,29 +12,29 @@ use embassy_net::tcp::TcpWriter;
 
 use super::{ReadPacket, WritePacket};
 use serde::Serialize;
+use serde_json_core::ser;
 
 // We don't have a StatusRequest packet because its empty and theres no point
 // We also don't have a StatusResponse packet since its just a wrapper over StatusJson
 
-const DATA: &'static str = r#"{"version":{"name":"1.20.1","protocol":763},"players":{"max":4,"online":0,},"description":{"text":"Hello, world!"},"enforcesSecureChat":false}"#;
-
 impl WritePacket for StatusJson {
     async fn write_packet(&self, socket: &mut TcpWriter<'_>) {
-        let data = DATA.as_bytes();
-        //serde_json_core::ser::to_slice(self, &mut data).unwrap();
-        let length = data.len() as i32;
+        let mut string = [0; 256];
+        let written = ser::to_slice(self, &mut string).unwrap();
 
-        log::info!("len {}", length);
+        let mut data = Slice::new(Vec::new().into_boxed_slice());
 
-        socket.write_varint(145).await;
-        socket.write_varint(0).await;
-        socket.write(data).await.unwrap();
+        data.write_varint(0).await;
+        data.write_varint(written as i32).await;
+        data.write(&string[..written]).await.unwrap();
 
-        log::info!("{:?}", data);
+        socket.write_varint(data.buf.len() as i32).await;
+        socket.write(&data.buf).await.unwrap();
 
         socket.flush().await.unwrap();
 
         log::info!("DONE WRITING!");
+        Timer::after_millis(100).await;
     }
 }
 

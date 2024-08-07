@@ -16,6 +16,7 @@ pub trait WritePacket {
     async fn write_packet(&self, socket: &mut TcpWriter<'_>);
 }
 
+#[derive(Debug)]
 pub struct Packet {
     pub id: i32,
     pub data: Slice,
