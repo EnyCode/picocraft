@@ -21,14 +21,16 @@ pub async fn handle_conn(
     //tx_buf: [u8; 8192],
 ) -> ! {
     info!("Handling connection");
-    Timer::after_millis(100).await;
-
-    let (mut read, mut write) = socket.split();
+    //Timer::after_millis(100).await;
 
     let mut state = State::Handshake;
     let channel: Channel<ThreadModeRawMutex, PacketEvent, 4> = Channel::new();
 
     loop {
+        info!("{}", socket.state());
+
+        let (mut read, mut write) = socket.split();
+
         read_packets(&mut read, &channel, &state).await;
 
         loop {
@@ -40,7 +42,7 @@ pub async fn handle_conn(
             match msg {
                 PacketEvent::ChangeState(new_state) => {
                     info!("Changing state to {:?}", new_state);
-                    Timer::after_millis(100).await;
+                    //Timer::after_millis(100).await;
                     state = new_state;
                 }
                 PacketEvent::StatusRequest => {
@@ -65,7 +67,7 @@ pub async fn handle_conn(
                 }
                 PacketEvent::PingRequest(payload) => {
                     info!("Sending pong with payload {}", payload);
-                    Timer::after_millis(100).await;
+                    //Timer::after_millis(100).await;
                     PongResponse { payload }.write_packet(&mut write).await;
                 }
             }
@@ -78,16 +80,25 @@ async fn read_packets(
     channel: &Channel<ThreadModeRawMutex, PacketEvent, 4>,
     state: &State,
 ) {
+    let mut packet = match parse_packet(socket).await {
+        Ok(packet) => packet,
+        Err(err) => {
+            info!("Error parsing packet: {:?}", err);
+            return;
+        }
+    };
+
     match state {
         State::Handshake => {
-            let mut packet = parse_packet(socket).await;
             info!("Received packet with id {}", packet.id);
-            Timer::after_millis(100).await;
+            //Timer::after_millis(100).await;
             match packet.id {
                 0x00 => {
                     info!("Packet data `{:?}`", packet.data);
-                    Timer::after_millis(100).await;
-                    let packet = HandshakePacket::read_packet(&mut packet.data).await;
+                    //Timer::after_millis(100).await;
+                    let packet = HandshakePacket::read_packet(&mut packet.data)
+                        .await
+                        .unwrap();
 
                     info!(
                         "Received handshake packet {} {} {} {:?}",
@@ -96,7 +107,7 @@ async fn read_packets(
                         packet.server_port,
                         packet.next_state
                     );
-                    Timer::after_millis(100).await;
+                    //Timer::after_millis(100).await;
 
                     channel
                         .send(PacketEvent::ChangeState(packet.next_state))
@@ -106,23 +117,23 @@ async fn read_packets(
             }
         }
         State::Status => {
-            let mut packet = parse_packet(socket).await;
+            info!("parsed packet");
 
             match packet.id {
                 0x00 => {
                     info!("Received status request");
-                    Timer::after_millis(100).await;
+                    //Timer::after_millis(100).await;
                     channel.send(PacketEvent::StatusRequest).await;
                 }
                 0x01 => {
                     info!("Received ping request");
-                    Timer::after_millis(100).await;
-                    let ping = PingRequest::read_packet(&mut packet.data).await;
+                    //Timer::after_millis(100).await;
+                    let ping = PingRequest::read_packet(&mut packet.data).await.unwrap();
                     channel.send(PacketEvent::PingRequest(ping.payload)).await;
                 }
                 _ => {
                     info!("Received unknown packet with id {}", packet.id);
-                    Timer::after_millis(100).await;
+                    //Timer::after_millis(100).await;
                 }
             }
         }

@@ -169,12 +169,12 @@ async fn main(spawner: Spawner) {
         "DHCP is up with IP {}",
         stack.config_v4().unwrap().address.address()
     );
-    Timer::after_millis(100).await;
+    //Timer::after_millis(100).await;
 
     // And now we can use it!
 
     info!("Created bufs");
-    Timer::after_millis(100).await;
+    //Timer::after_millis(100).await;
 
     static mut RX_BUF: [[u8; 1024]; 4] = [[0; 1024]; 4];
     static mut TX_BUF: [[u8; 1024]; 4] = [[0; 1024]; 4];
@@ -193,21 +193,21 @@ async fn main(spawner: Spawner) {
 
         control.gpio_set(0, false).await;
         info!("Listening on TCP:25565...");
-        Timer::after_millis(100).await;
+        //Timer::after_millis(100).await;
         if let Err(e) = socket.accept(25565).await {
             warn!("accept error: {:?}", e);
-            Timer::after_millis(100).await;
+            //Timer::after_millis(100).await;
             continue;
         }
 
         control.gpio_set(0, true).await;
         info!("Received connection from {:?}", socket.remote_endpoint());
-        Timer::after_millis(100).await;
+        //Timer::after_millis(100).await;
 
         spawner.spawn(handle_conn(socket)).unwrap();
 
         info!("Creating a new thingy majigy");
-        Timer::after_millis(100).await;
+        //Timer::after_millis(100).await;
 
         i += 1;
         if i >= 4 {

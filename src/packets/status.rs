@@ -8,7 +8,7 @@ use crate::{
     read::{ReadExtension, Slice},
     write::WriteExtension,
 };
-use embassy_net::tcp::TcpWriter;
+use embassy_net::tcp::{Error, TcpWriter};
 
 use super::{ReadPacket, WritePacket};
 use serde::Serialize;
@@ -34,7 +34,7 @@ impl WritePacket for StatusJson {
         socket.flush().await.unwrap();
 
         log::info!("DONE WRITING!");
-        Timer::after_millis(100).await;
+        //Timer::after_millis(100).await;
     }
 }
 
@@ -78,10 +78,10 @@ pub struct PingRequest {
 }
 
 impl ReadPacket for PingRequest {
-    async fn read_packet(socket: &mut Slice) -> Self {
-        PingRequest {
-            payload: socket.read_i64().await,
-        }
+    async fn read_packet(socket: &mut Slice) -> Result<Self, Error> {
+        Ok(PingRequest {
+            payload: socket.read_i64().await?,
+        })
     }
 }
 

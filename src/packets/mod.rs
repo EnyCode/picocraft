@@ -1,15 +1,16 @@
 use alloc::{boxed::Box, vec::Vec};
-use embassy_net::tcp::{TcpReader, TcpWriter};
+use embassy_net::tcp::{Error, TcpReader, TcpWriter};
 use embassy_time::Timer;
 use embedded_io_async::Read;
 use handshake::HandshakePacket;
+use log::info;
 
 use crate::read::{ReadExtension, Slice};
 
 pub mod status;
 
-pub trait ReadPacket {
-    async fn read_packet(socket: &mut Slice) -> Self;
+pub trait ReadPacket: Sized {
+    async fn read_packet(socket: &mut Slice) -> Result<Self, Error>;
 }
 
 pub trait WritePacket {
@@ -22,24 +23,26 @@ pub struct Packet {
     pub data: Slice,
 }
 
-pub async fn parse_packet(socket: &mut TcpReader<'_>) -> Packet {
-    let length = socket.read_varint().await as usize;
+pub async fn parse_packet(socket: &mut TcpReader<'_>) -> Result<Packet, Error> {
+    info!("reading varint");
+    let length = socket.read_varint().await? as usize;
+    info!("done reading varint");
     let mut data = Vec::with_capacity(length);
     unsafe { data.set_len(length) };
     socket.read(&mut data).await.unwrap();
 
     let mut slice = Slice::new(data.into_boxed_slice());
-    let id = slice.read_varint().await;
+    let id = slice.read_varint().await?;
 
     log::info!("DONE PARSING!");
-    Timer::after_millis(100).await;
+    //Timer::after_millis(100).await;
 
-    Packet { id, data: slice }
+    Ok(Packet { id, data: slice })
 }
 
 pub mod handshake {
     use alloc::string::String;
-    use embassy_net::tcp::TcpReader;
+    use embassy_net::tcp::{Error, TcpReader};
     use embassy_time::Timer;
     use log::info;
 
@@ -58,18 +61,18 @@ pub mod handshake {
     }
 
     impl ReadPacket for HandshakePacket {
-        async fn read_packet(socket: &mut Slice) -> Self {
-            HandshakePacket {
-                protocol_version: socket.read_varint().await,
-                server_address: socket.read_string().await,
-                server_port: socket.read_u16().await,
-                next_state: match socket.read_varint().await {
+        async fn read_packet(socket: &mut Slice) -> Result<Self, Error> {
+            Ok(HandshakePacket {
+                protocol_version: socket.read_varint().await?,
+                server_address: socket.read_string().await?,
+                server_port: socket.read_u16().await?,
+                next_state: match socket.read_varint().await? {
                     1 => State::Status,
                     2 => State::Login,
                     3 => State::Transfer,
                     any => State::Custom(any),
                 },
-            }
+            })
         }
     }
 }
